@@ -11,12 +11,23 @@ Project Objectives:
 
 Scope of Work:
 
-Phase 1:
-Phase 2:
-Phase 3:
-Phase 4:
-Phase 5:
-Phase 6:
+**Phase 1: Requirements Gathering**
+- Dateset identification
+- Business goal identification
+- FE design
+
+**Phase 2: Data Collection and Preprocessing**
+
+**Phase 3: Model Development**
+
+**Phase 4: Model Evaluation and Optimization**
+
+**Phase 5: Visualization and Reporting**
+
+**Phase 6: Deployment**
+
+**Phase 7: Testing and Validation**
+- Browsering news 
 
 
 Deliverables:
