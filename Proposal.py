@@ -7,6 +7,17 @@ This model will be trained on a labeled dataset containing real and fake news ar
 The textual data will be transformed into numerical features suitable for machine learning algorithms.
 
 Project Objectives:
+1. **Data Collection and Preprocessing**:
+
+
+2. **Model Development**:
+
+
+3. **Model Evaluation and Optimization**:
+
+
+4. **Visualization and Reporting**:
+
 
 
 Scope of Work:
