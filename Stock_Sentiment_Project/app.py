@@ -1,4 +1,4 @@
-from flask import Flask, render_template_string, request
+from flask import Flask, render_template, request
 import pandas as pd
 import pickle
 import os
@@ -118,6 +118,39 @@ def extract_text_from_url(url: str) -> str:
         return text
     except Exception:
         return ""
+
+def duckduckgo_recent_news(query: str, days: int = 3, max_results: int = 50):
+    try:
+        import time
+        import json
+        import urllib.parse
+        now = int(time.time())
+        threshold = now - days * 86400
+        ctx = ssl.create_default_context()
+        ua = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"}
+        q = urllib.parse.quote(query)
+        html_page = urllib.request.urlopen(urllib.request.Request(f"https://duckduckgo.com/?q={q}&iar=news&ia=news", headers=ua), context=ctx, timeout=10).read().decode("utf-8", "ignore")
+        m = re.search(r"vqd=([\w-]+)&", html_page)
+        if not m:
+            return []
+        vqd = m.group(1)
+        api = f"https://duckduckgo.com/news.js?o=json&q={q}&vqd={vqd}&p=1&l=us-en&dl=en&ct=US"
+        raw = urllib.request.urlopen(urllib.request.Request(api, headers=ua), context=ctx, timeout=10).read().decode("utf-8", "ignore")
+        obj = json.loads(raw)
+        results = []
+        for it in obj.get("results", [])[:max_results]:
+            ts = int(it.get("date") or 0)
+            if ts >= threshold:
+                results.append({
+                    "title": it.get("title") or "",
+                    "url": it.get("url") or "",
+                    "source": it.get("source") or "",
+                    "date": ts,
+                    "excerpt": it.get("excerpt") or "",
+                })
+        return results
+    except Exception:
+        return []
 
 # ------------------------------------------------------------
 # HTML template (with history + reset button)
@@ -315,6 +348,7 @@ TEMPLATE = """
     </div>
 
     <!-- Prediction form -->
+    <div class="grid">
     <div class="card">
       <h2>3. Paste Content OR Article URL</h2>
       <p class="subtitle">
@@ -380,9 +414,55 @@ TEMPLATE = """
       {% endif %}
     </div>
 
+    <di class="card">
+      
+        <h2>4. Recent News</h2>
+        <p class="subtitle">News from the last 3 days (DuckDuckGo). Select to analyze sentiment.</p>
+        <form method="post">
+          <input type="hidden" name="form_name" value="bulk_news">
+          <table>
+            <tr>
+              <th>Select</th>
+              <th>Title</th>
+              <th>Source</th>
+              <th>Date</th>
+            </tr>
+            {% for n in recent_news %}
+            <tr>
+              <td><input type="checkbox" name="selected_urls" value="{{ n.url }}"></td>
+              <td><a href="{{ n.url }}" target="_blank" rel="noopener">{{ n.title }}</a></td>
+              <td>{{ n.source }}</td>
+              <td>{{ n.date_str }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+          <button type="submit">Analyze Selected</button>
+        </form>
+
+        {% if bulk_results %}
+          <h3 style="margin-top:12px; font-size:16px;">Selected Sentiment</h3>
+          <table>
+            <tr>
+              <th>Title</th>
+              <th>Compound</th>
+              <th>Direction</th>
+            </tr>
+            {% for r in bulk_results %}
+            <tr>
+              <td><a href="{{ r.url }}" target="_blank" rel="noopener">{{ r.title }}</a></td>
+              <td>{{ "%.3f"|format(r.compound) }}</td>
+              <td>{{ r.direction }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        {% endif %}
+      
+      </div>
+    </div>
+
     <!-- History card -->
     <div class="card">
-      <h2>4. Recent Headline Predictions</h2>
+      <h2>5. Recent Headline Predictions</h2>
       <p class="subtitle">Last 10 headlines you tested, with their sentiment score and predicted direction.</p>
 
       <form method="post">
@@ -421,7 +501,7 @@ TEMPLATE = """
 </html>
 """
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder="tamplate")
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -431,8 +511,38 @@ def index():
     css_class = ""
     analyzed_text = ""
     analyzed_source = ""
+    recent_news = []
+    bulk_results = []
+
+    # Fetch recent news for the right column
+    for n in duckduckgo_recent_news("google stock", days=3, max_results=30):
+        n["date_str"] = datetime.utcfromtimestamp(n["date"]).strftime("%Y-%m-%d %H:%M")
+        recent_news.append(n)
 
     if request.method == "POST":
+        # Bulk analyze selected news URLs
+        if request.form.get("form_name") == "bulk_news":
+            selected = request.form.getlist("selected_urls")
+            by_url = {item["url"]: item for item in recent_news}
+            for u in selected:
+                txt = extract_text_from_url(u)
+                if not txt:
+                    continue
+                comp = sia.polarity_scores(txt)["compound"]
+                if comp >= 0.05:
+                    direction = "UP 📈"
+                elif comp <= -0.05:
+                    direction = "DOWN 📉"
+                else:
+                    direction = "UNCERTAIN 🤔"
+                title = by_url.get(u, {}).get("title", u)
+                bulk_results.append({
+                    "url": u,
+                    "title": title,
+                    "compound": comp,
+                    "direction": direction,
+                })
+        
         action = request.form.get("action", "predict")
 
         if action == "reset_history":
@@ -529,8 +639,8 @@ def index():
     )
     last_rows = last_rows.rename(columns={date_col: "date", price_col: "close"})
 
-    return render_template_string(
-        TEMPLATE,
+    return render_template(
+        "index.html",
         last_rows=last_rows.to_dict(orient="records"),
         prediction=prediction_text,
         sentiment=sentiment_score,
@@ -538,6 +648,8 @@ def index():
         history=HEADLINE_HISTORY,
         analyzed_text=analyzed_text,
         analyzed_source=analyzed_source,
+        recent_news=recent_news,
+        bulk_results=bulk_results,
         selected_source_type=request.form.get("source_type", "content") if request.method == "POST" else "content",
     )
 
