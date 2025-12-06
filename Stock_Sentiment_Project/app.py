@@ -9,7 +9,7 @@ from nltk.sentiment import SentimentIntensityAnalyzer
 ARTIFACT_DIR = "artifacts"
 
 # ------------------------------------------------------------
-# Load model, scaler, and data
+# Load model, scaler, and data (still used for chart/table)
 # ------------------------------------------------------------
 with open(os.path.join(ARTIFACT_DIR, "model.pkl"), "rb") as f:
     model = pickle.load(f)
@@ -18,25 +18,12 @@ with open(os.path.join(ARTIFACT_DIR, "scaler.pkl"), "rb") as f:
     scaler = pickle.load(f)
 
 data = pd.read_csv(os.path.join(ARTIFACT_DIR, "data_with_sentiment.csv"))
-
-# Normalize column names
 data.columns = [c.lower() for c in data.columns]
 
-# --- detect date / close / volume columns (works with your CSV) ---
-date_candidates = [c for c in data.columns if "date" in c]
-if not date_candidates:
-    raise ValueError("Could not find a date column in data_with_sentiment.csv")
-date_col = date_candidates[0]
-
-close_candidates = [c for c in data.columns if "close" in c]
-if not close_candidates:
-    raise ValueError("Could not find a close column in data_with_sentiment.csv")
-price_col = close_candidates[0]
-
-volume_candidates = [c for c in data.columns if "volume" in c]
-if not volume_candidates:
-    raise ValueError("Could not find a volume column in data_with_sentiment.csv")
-volume_col = volume_candidates[0]
+# detect key columns
+date_col = [c for c in data.columns if "date" in c][0]
+price_col = [c for c in data.columns if "close" in c][0]
+volume_col = [c for c in data.columns if "volume" in c][0]
 
 # ------------------------------------------------------------
 # Sentiment analyzer for custom headlines
@@ -45,7 +32,7 @@ nltk.download("vader_lexicon", quiet=True)
 sia = SentimentIntensityAnalyzer()
 
 # ------------------------------------------------------------
-# HTML template with CSS styling
+# HTML template (same style you had before)
 # ------------------------------------------------------------
 TEMPLATE = """
 <!DOCTYPE html>
@@ -54,9 +41,7 @@ TEMPLATE = """
   <meta charset="UTF-8">
   <title>Google Stock & News Sentiment Dashboard</title>
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -69,16 +54,9 @@ TEMPLATE = """
       color: white;
       box-shadow: 0 2px 8px rgba(15, 23, 42, 0.3);
     }
-    .header h1 {
-      margin: 0;
-      font-size: 26px;
-      font-weight: 600;
-    }
-    .header p {
-      margin: 6px 0 0;
-      font-size: 14px;
-      opacity: 0.9;
-    }
+    .header h1 { margin: 0; font-size: 26px; font-weight: 600; }
+    .header p { margin: 6px 0 0; font-size: 14px; opacity: 0.9; }
+
     .page {
       max-width: 1100px;
       margin: 25px auto 40px;
@@ -122,21 +100,11 @@ TEMPLATE = """
       text-align: left;
       border-bottom: 1px solid #e5e7eb;
     }
-    th {
-      background: #f9fafb;
-      font-weight: 600;
-    }
-    tr:nth-child(even) td {
-      background: #f9fafb;
-    }
-    .form-group {
-      margin-bottom: 10px;
-    }
-    label {
-      display: block;
-      font-size: 14px;
-      margin-bottom: 4px;
-    }
+    th { background: #f9fafb; font-weight: 600; }
+    tr:nth-child(even) td { background: #f9fafb; }
+
+    .form-group { margin-bottom: 10px; }
+    label { display: block; font-size: 14px; margin-bottom: 4px; }
     input[type="text"] {
       width: 100%;
       padding: 8px 10px;
@@ -160,9 +128,8 @@ TEMPLATE = """
       font-weight: 500;
       margin-top: 4px;
     }
-    button:hover {
-      background: #1d4ed8;
-    }
+    button:hover { background: #1d4ed8; }
+
     .prediction {
       margin-top: 12px;
       padding: 10px 12px;
@@ -180,10 +147,12 @@ TEMPLATE = """
       color: #b91c1c;
       border: 1px solid #fecaca;
     }
-    .prediction .label {
-      font-weight: 600;
-      margin-right: 4px;
+    .prediction.neutral {
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
     }
+    .prediction .label { font-weight: 600; margin-right: 4px; }
     .sentiment-score {
       font-size: 13px;
       color: #4b5563;
@@ -212,10 +181,10 @@ TEMPLATE = """
         <img src="/static/price_sentiment.png" alt="Price vs Sentiment" class="chart">
       </div>
 
-      <!-- Last days table -->
+      <!-- Last 10 trading days -->
       <div class="card">
         <h2>2. Last 10 Trading Days</h2>
-        <p class="subtitle">Recent closing prices and average sentiment used by the model.</p>
+        <p class="subtitle">Recent closing prices and average sentiment (0 means no news that day).</p>
         <table>
           <tr>
             <th>Date</th>
@@ -237,8 +206,8 @@ TEMPLATE = """
     <div class="card">
       <h2>3. Try Your Own Headline</h2>
       <p class="subtitle">
-        Type a news headline about Google. The app will compute sentiment and predict
-        whether the next-day price will move UP or DOWN.
+        Type a news headline about Google. We use VADER sentiment to classify it as positive, negative,
+        or neutral and then map that to a simple UP / DOWN / UNCERTAIN prediction.
       </p>
 
       <form method="post">
@@ -251,17 +220,18 @@ TEMPLATE = """
       </form>
 
       {% if prediction is not none %}
-        <div class="prediction {{ 'up' if prediction == 'UP 📈' else 'down' }}">
+        <div class="prediction {{ css_class }}">
           <span class="label">Prediction:</span> {{ prediction }}
         </div>
         <div class="sentiment-score">
-          Sentiment score (VADER compound): {{ "%.3f"|format(sentiment) }}
+          Headline sentiment (VADER compound): {{ "%.3f"|format(sentiment) }}
         </div>
       {% endif %}
     </div>
 
     <div class="footer">
-      Academic project • News sentiment is only one of many factors influencing stock prices.
+      Academic project • This interactive demo uses a simple sentiment-based rule
+      (not a real trading system).
     </div>
   </div>
 </body>
@@ -275,25 +245,27 @@ app = Flask(__name__)
 def index():
     prediction_text = None
     sentiment_score = None
+    css_class = ""
 
     if request.method == "POST":
         headline = request.form.get("headline", "")
         sentiment_score = sia.polarity_scores(headline)["compound"]
 
-        last_row = data.iloc[-1]
-        features = pd.DataFrame(
-            [{
-                "sentiment_mean": sentiment_score,
-                "return": last_row["return"],
-                "volume": last_row[volume_col],
-            }]
-        )
+        # SIMPLE, EXPLAINABLE RULE:
+        # sentiment >= 0.05   -> UP
+        # sentiment <= -0.05  -> DOWN
+        # otherwise           -> UNCERTAIN
+        if sentiment_score >= 0.05:
+            prediction_text = "UP 📈"
+            css_class = "up"
+        elif sentiment_score <= -0.05:
+            prediction_text = "DOWN 📉"
+            css_class = "down"
+        else:
+            prediction_text = "UNCERTAIN 🤔"
+            css_class = "neutral"
 
-        X_scaled = scaler.transform(features.values)
-        pred = model.predict(X_scaled)[0]
-        prediction_text = "UP 📈" if pred == 1 else "DOWN 📉"
-
-    # last 10 days for table
+    # show actual last 10 rows (even if sentiment is 0 = no news)
     last_rows = (
         data[[date_col, price_col, "sentiment_mean"]]
         .tail(10)
@@ -306,6 +278,7 @@ def index():
         last_rows=last_rows.to_dict(orient="records"),
         prediction=prediction_text,
         sentiment=sentiment_score,
+        css_class=css_class,
     )
 
 
