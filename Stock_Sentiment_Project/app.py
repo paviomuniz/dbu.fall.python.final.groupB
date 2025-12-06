@@ -2,20 +2,31 @@ from flask import Flask, render_template_string, request
 import pandas as pd
 import pickle
 import os
+import urllib.request
+import urllib.parse
+import ssl
+import re
+import html
 
 import nltk
 from nltk.sentiment import SentimentIntensityAnalyzer
 
-ARTIFACT_DIR = "artifacts"
+ARTIFACT_DIR = os.path.join(os.path.dirname(__file__), "artifacts")
 
 # ------------------------------------------------------------
 # Load model, scaler, and data (still used for chart/table)
 # ------------------------------------------------------------
-with open(os.path.join(ARTIFACT_DIR, "model.pkl"), "rb") as f:
-    model = pickle.load(f)
+try:
+    with open(os.path.join(ARTIFACT_DIR, "model.pkl"), "rb") as f:
+        model = pickle.load(f)
+except Exception:
+    model = None
 
-with open(os.path.join(ARTIFACT_DIR, "scaler.pkl"), "rb") as f:
-    scaler = pickle.load(f)
+try:
+    with open(os.path.join(ARTIFACT_DIR, "scaler.pkl"), "rb") as f:
+        scaler = pickle.load(f)
+except Exception:
+    scaler = None
 
 data = pd.read_csv(os.path.join(ARTIFACT_DIR, "data_with_sentiment.csv"))
 data.columns = [c.lower() for c in data.columns]
@@ -30,6 +41,39 @@ volume_col = [c for c in data.columns if "volume" in c][0]
 # ------------------------------------------------------------
 nltk.download("vader_lexicon", quiet=True)
 sia = SentimentIntensityAnalyzer()
+
+def extract_text_from_url(url: str) -> str:
+    try:
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return ""
+        ctx = ssl.create_default_context()
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+            },
+        )
+        with urllib.request.urlopen(req, context=ctx, timeout=10) as resp:
+            raw = resp.read()
+        try:
+            html_text = raw.decode("utf-8", errors="ignore")
+        except Exception:
+            html_text = raw.decode("latin-1", errors="ignore")
+        m = re.search(r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\']([^"\']+)["\']', html_text, flags=re.I)
+        title = m.group(1).strip() if m else ""
+        if not title:
+            m = re.search(r"<title[^>]*>(.*?)</title>", html_text, flags=re.I | re.S)
+            title = re.sub(r"\s+", " ", m.group(1).strip()) if m else ""
+        cleaned = re.sub(r"<script[\s\S]*?</script>|<style[\s\S]*?</style>", " ", html_text, flags=re.I)
+        cleaned = re.sub(r"<[^>]+>", " ", cleaned)
+        cleaned = html.unescape(cleaned)
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+        body_snip = cleaned[:800]
+        text = (title + " " + body_snip).strip()
+        return text
+    except Exception:
+        return ""
 
 # ------------------------------------------------------------
 # HTML template (same style you had before)
@@ -114,6 +158,20 @@ TEMPLATE = """
       outline: none;
     }
     input[type="text"]:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+    }
+    textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      font-size: 14px;
+      outline: none;
+      resize: vertical;
+      min-height: 120px;
+    }
+    textarea:focus {
       border-color: #2563eb;
       box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
     }
@@ -204,28 +262,63 @@ TEMPLATE = """
 
     <!-- Prediction form -->
     <div class="card">
-      <h2>3. Try Your Own Headline</h2>
+      <h2>3. Paste Content OR Article URL</h2>
       <p class="subtitle">
-        Type a news headline about Google. We use VADER sentiment to classify it as positive, negative,
-        or neutral and then map that to a simple UP / DOWN / UNCERTAIN prediction.
+        Choose one source below. If you enter only a URL, the app will fetch the article and analyze its content. We use VADER to classify it and map to UP / DOWN / UNCERTAIN.
       </p>
 
       <form method="post">
         <div class="form-group">
-          <label for="headline">News headline about Google:</label>
-          <input type="text" id="headline" name="headline"
-                 placeholder="Example: Google announces record-breaking quarterly earnings..." required>
+          <label>Choose source:</label>
+          <label><input type="radio" name="source_type" value="content" {% if selected_source_type == 'content' %}checked{% endif %}> Paste content</label>
+          <label style="margin-left:12px;"><input type="radio" name="source_type" value="url" {% if selected_source_type == 'url' %}checked{% endif %}> Article URL</label>
+        </div>
+        <div class="form-group">
+          <label for="content">Paste news content:</label>
+          <textarea id="content" name="content" placeholder="Paste the article text here..."></textarea>
+        </div>
+        <div class="form-group">
+          <label for="url">News article URL (optional):</label>
+          <input type="text" id="url" name="url" placeholder="https://example.com/news/google-article">
         </div>
         <button type="submit">Predict Price Direction</button>
       </form>
+
+      <script>
+        (function(){
+          function toggle(){
+            var source = document.querySelector('input[name="source_type"]:checked');
+            var isContent = !source || source.value === 'content';
+            var contentEl = document.getElementById('content');
+            var urlEl = document.getElementById('url');
+            var contentGroup = contentEl.parentElement;
+            var urlGroup = urlEl.parentElement;
+            contentGroup.style.display = isContent ? 'block' : 'none';
+            urlGroup.style.display = isContent ? 'none' : 'block';
+            contentEl.required = isContent;
+            urlEl.required = !isContent;
+          }
+          var radios = document.querySelectorAll('input[name="source_type"]');
+          radios.forEach(function(r){ r.addEventListener('change', toggle); });
+          toggle();
+        })();
+      </script>
 
       {% if prediction is not none %}
         <div class="prediction {{ css_class }}">
           <span class="label">Prediction:</span> {{ prediction }}
         </div>
         <div class="sentiment-score">
-          Headline sentiment (VADER compound): {{ "%.3f"|format(sentiment) }}
+          Sentiment (VADER compound): {{ "%.3f"|format(sentiment) }}
         </div>
+        {% if analyzed_text %}
+        <div class="sentiment-score">
+          Analyzed source: {{ analyzed_source }}
+        </div>
+        <div class="sentiment-score">
+          Text snippet: {{ analyzed_text|truncate(300) }}
+        </div>
+        {% endif %}
       {% endif %}
     </div>
 
@@ -246,24 +339,51 @@ def index():
     prediction_text = None
     sentiment_score = None
     css_class = ""
+    analyzed_text = ""
+    analyzed_source = ""
 
     if request.method == "POST":
-        headline = request.form.get("headline", "")
-        sentiment_score = sia.polarity_scores(headline)["compound"]
+        source_type = request.form.get("source_type", "content").strip()
+        content = request.form.get("content", "").strip()
+        url = request.form.get("url", "").strip()
+        text_to_analyze = ""
+        if source_type == "content":
+            if content:
+                text_to_analyze = content
+                analyzed_text = content
+                analyzed_source = "Content"
+            elif url:
+                text_to_analyze = extract_text_from_url(url)
+                if text_to_analyze:
+                    analyzed_text = text_to_analyze
+                    analyzed_source = "URL"
+        else:  # source_type == "url"
+            if url:
+                text_to_analyze = extract_text_from_url(url)
+                if text_to_analyze:
+                    analyzed_text = text_to_analyze
+                    analyzed_source = "URL"
+            elif content:
+                text_to_analyze = content
+                analyzed_text = content
+                analyzed_source = "Content"
+        if text_to_analyze:
+            sentiment_score = sia.polarity_scores(text_to_analyze)["compound"]
 
         # SIMPLE, EXPLAINABLE RULE:
         # sentiment >= 0.05   -> UP
         # sentiment <= -0.05  -> DOWN
         # otherwise           -> UNCERTAIN
-        if sentiment_score >= 0.05:
-            prediction_text = "UP 📈"
-            css_class = "up"
-        elif sentiment_score <= -0.05:
-            prediction_text = "DOWN 📉"
-            css_class = "down"
-        else:
-            prediction_text = "UNCERTAIN 🤔"
-            css_class = "neutral"
+        if sentiment_score is not None:
+            if sentiment_score >= 0.05:
+                prediction_text = "UP 📈"
+                css_class = "up"
+            elif sentiment_score <= -0.05:
+                prediction_text = "DOWN 📉"
+                css_class = "down"
+            else:
+                prediction_text = "UNCERTAIN 🤔"
+                css_class = "neutral"
 
     # show actual last 10 rows (even if sentiment is 0 = no news)
     last_rows = (
@@ -279,6 +399,9 @@ def index():
         prediction=prediction_text,
         sentiment=sentiment_score,
         css_class=css_class,
+        analyzed_text=analyzed_text,
+        analyzed_source=analyzed_source,
+        selected_source_type=request.form.get("source_type", "content") if request.method == "POST" else "content",
     )
 
 
