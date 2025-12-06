@@ -171,6 +171,17 @@ def main():
     model = LogisticRegression(max_iter=1000)
     model.fit(X_train_scaled, y_train)
 
+    from sklearn.ensemble import RandomForestClassifier
+
+    print("Training Random Forest...")
+    rf_model = RandomForestClassifier(
+        n_estimators=200,
+        max_depth=10,
+        random_state=42
+)
+    rf_model.fit(X_train, y_train)   # RF prefers unscaled data
+
+
     # ------------------------------------------------------------
     # 11) Evaluate model
     # ------------------------------------------------------------
@@ -178,12 +189,13 @@ def main():
     y_pred = model.predict(X_test_scaled)
     acc = accuracy_score(y_test, y_pred)
 
-    print("\n=== Model Evaluation ===")
-    print(f"Accuracy: {acc:.3f}")
-    print("\nClassification Report:")
-    print(classification_report(y_test, y_pred))
-    print("Confusion Matrix:")
-    print(confusion_matrix(y_test, y_pred))
+    # Evaluate Random Forest
+    print("\n=== Random Forest Evaluation ===")
+    rf_pred = rf_model.predict(X_test)
+    rf_acc = accuracy_score(y_test, rf_pred)
+    print(f"Accuracy: {rf_acc:.3f}")
+    print(confusion_matrix(y_test, rf_pred))
+
 
     # ------------------------------------------------------------
     # 12) Save model, scaler, and merged data
