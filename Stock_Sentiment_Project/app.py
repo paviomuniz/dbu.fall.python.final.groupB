@@ -2,6 +2,7 @@ from flask import Flask, render_template_string, request
 import pandas as pd
 import pickle
 import os
+from datetime import datetime
 
 import nltk
 from nltk.sentiment import SentimentIntensityAnalyzer
@@ -31,8 +32,51 @@ volume_col = [c for c in data.columns if "volume" in c][0]
 nltk.download("vader_lexicon", quiet=True)
 sia = SentimentIntensityAnalyzer()
 
+# Simple keyword lists to "help" VADER on very short headlines
+POSITIVE_HINTS = [
+    "making money",
+    "doing great",
+    "great in cloud",
+    "record-breaking",
+    "record breaking",
+    "strong growth",
+    "strong results",
+    "profit",
+    "profits",
+    "growing",
+    "better than expected",
+    "beats expectations",
+    "beat expectations",
+]
+
+NEGATIVE_HINTS = [
+    "not doing great",
+    "not good",
+    "losing money",
+    "losing",
+    "loss",
+    "went down",
+    "stocks went down",
+    "is down",
+    "down in cloud",
+    "bad",
+    "lawsuit",
+    "antitrust",
+    "fine",
+    "regulatory action",
+    "drop",
+    "dropped",
+    "fell",
+    "falling",
+]
+
 # ------------------------------------------------------------
-# HTML template (same style you had before)
+# Simple in-memory history of last 10 predictions
+# ------------------------------------------------------------
+HEADLINE_HISTORY = []  # each item: dict(timestamp, headline, sentiment, prediction)
+
+# ------------------------------------------------------------
+# HTML template (with history + reset button)
 # ------------------------------------------------------------
 TEMPLATE = """
 <!DOCTYPE html>
@@ -73,6 +117,7 @@ TEMPLATE = """
       border-radius: 14px;
       padding: 18px 20px;
       box-shadow: 0 1px 6px rgba(15, 23, 42, 0.12);
+      margin-bottom: 18px;
     }
     .card h2 {
       margin: 0 0 10px;
@@ -99,6 +144,7 @@ TEMPLATE = """
       padding: 6px 8px;
       text-align: left;
       border-bottom: 1px solid #e5e7eb;
+      vertical-align: top;
     }
     th { background: #f9fafb; font-weight: 600; }
     tr:nth-child(even) td { background: #f9fafb; }
@@ -129,6 +175,14 @@ TEMPLATE = """
       margin-top: 4px;
     }
     button:hover { background: #1d4ed8; }
+
+    .btn-reset {
+      background: #6b7280;
+      margin-bottom: 8px;
+    }
+    .btn-reset:hover {
+      background: #4b5563;
+    }
 
     .prediction {
       margin-top: 12px;
@@ -206,11 +260,12 @@ TEMPLATE = """
     <div class="card">
       <h2>3. Try Your Own Headline</h2>
       <p class="subtitle">
-        Type a news headline about Google. We use VADER sentiment to classify it as positive, negative,
-        or neutral and then map that to a simple UP / DOWN / UNCERTAIN prediction.
+        Type a news headline about Google. We use VADER + simple keyword rules to classify it
+        as positive, negative, or neutral and then map that to UP / DOWN / UNCERTAIN.
       </p>
 
       <form method="post">
+        <input type="hidden" name="action" value="predict">
         <div class="form-group">
           <label for="headline">News headline about Google:</label>
           <input type="text" id="headline" name="headline"
@@ -224,8 +279,40 @@ TEMPLATE = """
           <span class="label">Prediction:</span> {{ prediction }}
         </div>
         <div class="sentiment-score">
-          Headline sentiment (VADER compound): {{ "%.3f"|format(sentiment) }}
+          Headline sentiment (final score): {{ "%.3f"|format(sentiment) }}
         </div>
+      {% endif %}
+    </div>
+
+    <!-- History card -->
+    <div class="card">
+      <h2>4. Recent Headline Predictions</h2>
+      <p class="subtitle">Last 10 headlines you tested, with their sentiment score and predicted direction.</p>
+
+      <form method="post">
+        <input type="hidden" name="action" value="reset_history">
+        <button type="submit" class="btn-reset">Reset history</button>
+      </form>
+
+      {% if history %}
+      <table>
+        <tr>
+          <th>Time</th>
+          <th>Headline</th>
+          <th>Sentiment</th>
+          <th>Prediction</th>
+        </tr>
+        {% for item in history %}
+        <tr>
+          <td style="white-space: nowrap;">{{ item.timestamp }}</td>
+          <td>{{ item.headline }}</td>
+          <td>{{ "%.3f"|format(item.sentiment) }}</td>
+          <td>{{ item.prediction }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% else %}
+      <p class="subtitle">No headlines tested yet. Try entering one above.</p>
       {% endif %}
     </div>
 
@@ -248,24 +335,55 @@ def index():
     css_class = ""
 
     if request.method == "POST":
-        headline = request.form.get("headline", "")
-        sentiment_score = sia.polarity_scores(headline)["compound"]
+        action = request.form.get("action", "predict")
 
-        # SIMPLE, EXPLAINABLE RULE:
-        # sentiment >= 0.05   -> UP
-        # sentiment <= -0.05  -> DOWN
-        # otherwise           -> UNCERTAIN
-        if sentiment_score >= 0.05:
-            prediction_text = "UP 📈"
-            css_class = "up"
-        elif sentiment_score <= -0.05:
-            prediction_text = "DOWN 📉"
-            css_class = "down"
-        else:
-            prediction_text = "UNCERTAIN 🤔"
-            css_class = "neutral"
+        if action == "reset_history":
+            # Clear the stored headlines
+            HEADLINE_HISTORY.clear()
 
-    # show actual last 10 rows (even if sentiment is 0 = no news)
+        elif action == "predict":
+            headline = request.form.get("headline", "")
+            base_score = sia.polarity_scores(headline)["compound"]
+
+            # Apply simple keyword boost to help VADER on very short texts
+            text_lower = headline.lower()
+            boost = 0.0
+
+            for kw in POSITIVE_HINTS:
+                if kw in text_lower:
+                    boost += 0.4
+                    break
+
+            for kw in NEGATIVE_HINTS:
+                if kw in text_lower:
+                    boost -= 0.4
+                    break
+
+            # Final sentiment score, clipped to [-1, 1]
+            sentiment_score = max(-1.0, min(1.0, base_score + boost))
+
+            # More sensitive thresholds: fewer "UNCERTAIN"
+            if sentiment_score >= 0.02:
+                prediction_text = "UP 📈"
+                css_class = "up"
+            elif sentiment_score <= -0.02:
+                prediction_text = "DOWN 📉"
+                css_class = "down"
+            else:
+                prediction_text = "UNCERTAIN 🤔"
+                css_class = "neutral"
+
+            # Store in history (max 10 items)
+            HEADLINE_HISTORY.append({
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "headline": headline,
+                "sentiment": sentiment_score,
+                "prediction": prediction_text,
+            })
+            if len(HEADLINE_HISTORY) > 10:
+                HEADLINE_HISTORY.pop(0)  # remove oldest
+
+    # show last 10 calendar days (0 sentiment = no news)
     last_rows = (
         data[[date_col, price_col, "sentiment_mean"]]
         .tail(10)
@@ -279,6 +397,7 @@ def index():
         prediction=prediction_text,
         sentiment=sentiment_score,
         css_class=css_class,
+        history=HEADLINE_HISTORY,
     )
 
 
