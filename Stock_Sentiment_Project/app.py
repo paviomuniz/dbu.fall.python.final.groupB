@@ -414,7 +414,7 @@ TEMPLATE = """
       {% endif %}
     </div>
 
-    <di class="card">
+    <div class="card">
       
         <h2>4. Recent News</h2>
         <p class="subtitle">News from the last 3 days (DuckDuckGo). Select to analyze sentiment.</p>

@@ -159,14 +159,16 @@
     <p>Trained ML model using daily stock prices + news headline sentiment.</p>
   </div>
 
-  <div class="page">
+    <div class="page">
     <div class="grid">
+      <!-- 1. Price vs Sentiment (History) -->
       <div class="card">
         <h2>1. Price vs Sentiment (History)</h2>
         <p class="subtitle">Historical closing price and average daily news sentiment.</p>
         <img src="/static/price_sentiment.png" alt="Price vs Sentiment" class="chart">
       </div>
 
+      <!-- 2. Last 10 Trading Days -->
       <div class="card">
         <h2>2. Last 10 Trading Days</h2>
         <p class="subtitle">Recent closing prices and average sentiment (0 means no news that day).</p>
@@ -185,77 +187,75 @@
           {% endfor %}
         </table>
       </div>
-    </div>
 
-    <div class="grid">
-    <div class="card">
-      <h2>3. Paste Content OR Article URL</h2>
-      <p class="subtitle">
-        Type a news headline about Google. We use VADER + simple keyword rules to classify it
-        as positive, negative, or neutral and then map that to UP / DOWN / UNCERTAIN.
-        Choose one source below. If you enter only a URL, the app will fetch the article and analyze its content. We use VADER to classify it and map to UP / DOWN / UNCERTAIN.
-      </p>
+      <!-- 3. Paste Content OR Article URL -->
+      <div class="card">
+        <h2>3. Paste Content OR Article URL</h2>
+        <p class="subtitle">
+          Type a news headline about Google. We use VADER + simple keyword rules to classify it
+          as positive, negative, or neutral and then map that to UP / DOWN / UNCERTAIN.
+          Choose one source below. If you enter only a URL, the app will fetch the article and analyze its content. We use VADER to classify it and map to UP / DOWN / UNCERTAIN.
+        </p>
 
-      <form method="post">
-        <input type="hidden" name="action" value="predict">
-        <div class="form-group">
-          <label>Choose source:</label>
-          <label><input type="radio" name="source_type" value="content" {% if selected_source_type == 'content' %}checked{% endif %}> Paste content</label>
-          <label style="margin-left:12px;"><input type="radio" name="source_type" value="url" {% if selected_source_type == 'url' %}checked{% endif %}> Article URL</label>
-        </div>
-        <div class="form-group">
-          <label for="content">Paste news content:</label>
-          <textarea id="content" name="content" placeholder="Paste the article text here..."></textarea>
-        </div>
-        <div class="form-group">
-          <label for="url">News article URL (optional):</label>
-          <input type="text" id="url" name="url" placeholder="https://example.com/news/google-article">
-        </div>
-        <button type="submit">Predict Price Direction</button>
-      </form>
+        <form method="post">
+          <input type="hidden" name="action" value="predict">
+          <div class="form-group">
+            <label>Choose source:</label>
+            <label><input type="radio" name="source_type" value="content" {% if selected_source_type == 'content' %}checked{% endif %}> Paste content</label>
+            <label style="margin-left:12px;"><input type="radio" name="source_type" value="url" {% if selected_source_type == 'url' %}checked{% endif %}> Article URL</label>
+          </div>
+          <div class="form-group">
+            <label for="content">Paste news content:</label>
+            <textarea id="content" name="content" placeholder="Paste the article text here..."></textarea>
+          </div>
+          <div class="form-group">
+            <label for="url">News article URL (optional):</label>
+            <input type="text" id="url" name="url" placeholder="https://example.com/news/google-article">
+          </div>
+          <button type="submit">Predict Price Direction</button>
+        </form>
 
-      <script>
-        (function(){
-          function toggle(){
-            var source = document.querySelector('input[name="source_type"]:checked');
-            var isContent = !source || source.value === 'content';
-            var contentEl = document.getElementById('content');
-            var urlEl = document.getElementById('url');
-            var contentGroup = contentEl.parentElement;
-            var urlGroup = urlEl.parentElement;
-            contentGroup.style.display = isContent ? 'block' : 'none';
-            urlGroup.style.display = isContent ? 'none' : 'block';
-            contentEl.required = isContent;
-            urlEl.required = !isContent;
-          }
-          var radios = document.querySelectorAll('input[name="source_type"]');
-          radios.forEach(function(r){ r.addEventListener('change', toggle); });
-          toggle();
-        })();
-      </script>
+        <script>
+          (function(){
+            function toggle(){
+              var source = document.querySelector('input[name="source_type"]:checked');
+              var isContent = !source || source.value === 'content';
+              var contentEl = document.getElementById('content');
+              var urlEl = document.getElementById('url');
+              var contentGroup = contentEl.parentElement;
+              var urlGroup = urlEl.parentElement;
+              contentGroup.style.display = isContent ? 'block' : 'none';
+              urlGroup.style.display = isContent ? 'none' : 'block';
+              contentEl.required = isContent;
+              urlEl.required = !isContent;
+            }
+            var radios = document.querySelectorAll('input[name="source_type"]');
+            radios.forEach(function(r){ r.addEventListener('change', toggle); });
+            toggle();
+          })();
+        </script>
 
-      {% if prediction is not none %}
-        <div class="prediction {{ css_class }}">
-          <span class="label">Prediction:</span> {{ prediction }}
-        </div>
-        <div class="sentiment-score">
-          Headline sentiment (final score): {{ "%.3f"|format(sentiment) }}
-          Sentiment (VADER compound): {{ "%.3f"|format(sentiment) }}
-        </div>
-        {% if analyzed_text %}
-        <div class="sentiment-score">
-          Analyzed source: {{ analyzed_source }}
-        </div>
-        <div class="sentiment-score">
-          Text snippet: {{ analyzed_text|truncate(300) }}
-        </div>
+        {% if prediction is not none %}
+          <div class="prediction {{ css_class }}">
+            <span class="label">Prediction:</span> {{ prediction }}
+          </div>
+          <div class="sentiment-score">
+            Headline sentiment (final score): {{ "%.3f"|format(sentiment) }}
+            Sentiment (VADER compound): {{ "%.3f"|format(sentiment) }}
+          </div>
+          {% if analyzed_text %}
+          <div class="sentiment-score">
+            Analyzed source: {{ analyzed_source }}
+          </div>
+          <div class="sentiment-score">
+            Text snippet: {{ analyzed_text|truncate(300) }}
+          </div>
+          {% endif %}
         {% endif %}
-      {% endif %}
-    </div>
-    </div>
+      </div>
 
-    <div class="grid">
-      <div class="card" style="grid-column: 2;">
+      <!-- 4. Recent News -->
+      <div class="card">
         <h2>4. Recent News</h2>
         <p class="subtitle">News from the last 3 days (DuckDuckGo). Select to analyze sentiment.</p>
         <form method="post">
@@ -299,6 +299,7 @@
       </div>
     </div>
 
+    <!-- 5. Recent Headline Predictions (history card) -->
     <div class="card">
       <h2>5. Recent Headline Predictions</h2>
       <p class="subtitle">Last 10 headlines you tested, with their sentiment score and predicted direction.</p>
@@ -335,5 +336,3 @@
       (not a real trading system).
     </div>
   </div>
-</body>
-</html>
