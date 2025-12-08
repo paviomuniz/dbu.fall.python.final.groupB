@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request
+from stock_sentiment_train import train_bp
 import pandas as pd
 import pickle
 import os
@@ -502,6 +503,7 @@ TEMPLATE = """
 """
 
 app = Flask(__name__, template_folder="tamplate")
+app.register_blueprint(train_bp)
 
 
 @app.route("/", methods=["GET", "POST"])
