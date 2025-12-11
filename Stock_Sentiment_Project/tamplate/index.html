@@ -165,11 +165,60 @@
     <div class="page">
     <div class="grid">
       <!-- 1. Price vs Sentiment (History) -->
-      <div class="card">
-        <h2>1. Price vs Sentiment (History)</h2>
-        <p class="subtitle">Historical closing price and average daily news sentiment.</p>
-        <img src="/static/price_sentiment.png" alt="Price vs Sentiment" class="chart">
-      </div>
+   <div class="card">
+  <h2>1. Price vs Sentiment (History)</h2>
+  <p class="subtitle">Historical closing price and average daily news sentiment.</p>
+
+  <!-- Container for interactive chart -->
+  <div id="interactiveChart" style="height: 420px;"></div>
+
+  <!-- Load Plotly -->
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script>
+    // Data passed from Flask (Python) as JSON
+    const priceData = {{ price_json | tojson }};
+
+    const dates = priceData.map(row => row.date);
+    const prices = priceData.map(row => row.close);
+    const sentiments = priceData.map(row => row.sentiment_mean);
+
+    const priceTrace = {
+      x: dates,
+      y: prices,
+      name: "Close Price",
+      type: "scatter",
+      mode: "lines",
+      line: { width: 2 }
+    };
+
+    const sentimentTrace = {
+      x: dates,
+      y: sentiments,
+      name: "Average Sentiment",
+      type: "scatter",
+      mode: "lines",
+      yaxis: "y2",
+      line: { width: 2, dash: "dot" }
+    };
+
+    const layout = {
+      title: "Google Stock Price vs News Sentiment (Interactive)",
+      xaxis: { title: "Date" },
+      yaxis: { title: "Price" },
+      yaxis2: {
+        title: "Sentiment",
+        overlaying: "y",
+        side: "right"
+      },
+      hovermode: "x unified",
+      legend: { orientation: "h", y: -0.2 },
+      margin: { l: 50, r: 50, t: 40, b: 40 }
+    };
+
+    Plotly.newPlot("interactiveChart", [priceTrace, sentimentTrace], layout);
+  </script>
+</div>
+
 
       <!-- 2. Last 10 Trading Days -->
       <div class="card">

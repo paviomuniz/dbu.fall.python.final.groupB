@@ -38,6 +38,7 @@ date_col = [c for c in data.columns if "date" in c][0]
 price_col = [c for c in data.columns if "close" in c][0]
 volume_col = [c for c in data.columns if "volume" in c][0]
 
+
 # ------------------------------------------------------------
 # Sentiment analyzer for custom headlines
 # ------------------------------------------------------------
@@ -634,12 +635,20 @@ def index():
                 HEADLINE_HISTORY.pop(0)  # remove oldest
 
     # show last 10 calendar days (0 sentiment = no news)
+        # show last 10 calendar days (0 sentiment = no news)
     last_rows = (
         data[[date_col, price_col, "sentiment_mean"]]
         .tail(10)
         .copy()
     )
     last_rows = last_rows.rename(columns={date_col: "date", price_col: "close"})
+
+    # -------- NEW: full history for interactive chart --------
+    price_df = data[[date_col, price_col, "sentiment_mean"]].copy()
+    price_df = price_df.rename(columns={date_col: "date", price_col: "close"})
+    price_df["date"] = pd.to_datetime(price_df["date"]).dt.strftime("%Y-%m-%d")
+    price_json = price_df.to_dict(orient="records")
+    # ---------------------------------------------------------
 
     return render_template(
         "index.html",
@@ -653,7 +662,10 @@ def index():
         recent_news=recent_news,
         bulk_results=bulk_results,
         selected_source_type=request.form.get("source_type", "content") if request.method == "POST" else "content",
+        # NEW: send data to the template
+        price_json=price_json,
     )
+
 
 
 if __name__ == "__main__":
