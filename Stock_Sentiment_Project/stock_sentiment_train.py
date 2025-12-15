@@ -388,6 +388,18 @@ with open(os.path.join(MODEL_DIR, "rf_sentiment_classifier.pkl"), "wb") as f:
 
 print("Random Forest classifier saved successfully.")
 
+def predict_next_close(latest_close, sentiment_score, model, scaler):
+    """
+    Predict next day's closing price using trained regression model
+    """
+    import numpy as np
+
+    X = np.array([[latest_close, sentiment_score]])
+    X_scaled = scaler.transform(X)
+    prediction = model.predict(X_scaled)
+
+    return float(prediction[0])
+
 #     from sklearn.model_selection import train_test_split
 #     X_train, X_test, y_train, y_test = train_test_split(
 #         X, y, test_size=0.2, random_state=42, shuffle=True

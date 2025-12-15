@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request
+from stock_sentiment_train import predict_next_close
 import pandas as pd
 import pickle
 import os
@@ -618,17 +619,18 @@ def index():
         # sentiment >= 0.05   -> UP
         # sentiment <= -0.05  -> DOWN
         # otherwise           -> UNCERTAIN
-            if sentiment_score is not None and rf_model is not None:
-              proba = rf_model.predict_proba([[sentiment_score]])[0]
-              pred = int(proba.argmax())
-              confidence = round(proba[pred] * 100, 2)
+            if sentiment_score is not None:
+              latest_close_price = data.iloc[-1][price_col]
 
-              if pred == 1:
-                prediction_text = f"UP 📈 ({confidence}%)"
-                css_class = "up"
-              else:
-                prediction_text = f"DOWN 📉 ({confidence}%)"
-                css_class = "down"
+              predicted_price = None
+              if model is not None and scaler is not None:
+                  predicted_price = predict_next_close(
+                      latest_close=latest_close_price,
+                      sentiment_score=sentiment_score,
+                      model=model,
+                      scaler=scaler
+                  )
+
 
 
             # Store in history (max 10 items)
@@ -669,8 +671,8 @@ def index():
         recent_news=recent_news,
         bulk_results=bulk_results,
         selected_source_type=request.form.get("source_type", "content") if request.method == "POST" else "content",
-        # NEW: send data to the template
         price_json=price_json,
+        predicted_price=predicted_price   
     )
 
 
