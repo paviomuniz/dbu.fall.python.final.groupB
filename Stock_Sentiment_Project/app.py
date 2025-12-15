@@ -1,5 +1,4 @@
 from flask import Flask, render_template, request
-from stock_sentiment_train import predict_next_close
 import pandas as pd
 import pickle
 import os
@@ -522,6 +521,7 @@ def index():
     analyzed_source = ""
     recent_news = []
     bulk_results = []
+    predicted_price = None
 
     # Fetch recent news for the right column
     for n in duckduckgo_recent_news("google stock", days=3, max_results=30):
@@ -619,17 +619,10 @@ def index():
         # sentiment >= 0.05   -> UP
         # sentiment <= -0.05  -> DOWN
         # otherwise           -> UNCERTAIN
-            if sentiment_score is not None:
-              latest_close_price = data.iloc[-1][price_col]
-
-              predicted_price = None
-              if model is not None and scaler is not None:
-                  predicted_price = predict_next_close(
-                      latest_close=latest_close_price,
-                      sentiment_score=sentiment_score,
-                      model=model,
-                      scaler=scaler
-                  )
+            if sentiment_score is not None and rf_model is not None:
+              proba = rf_model.predict_proba([[sentiment_score]])[0]
+              pred = int(proba.argmax())
+              confidence = round(proba[pred] * 100, 2)
 
 
 

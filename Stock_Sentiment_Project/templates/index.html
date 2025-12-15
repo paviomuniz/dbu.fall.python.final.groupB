@@ -305,13 +305,6 @@
           {% endif %}
         {% endif %}
       </div>
-        {% if predicted_price %}
-          <div class="sentiment-score" style="margin-top:8px;">
-              📈 <strong>Predicted Next-Day Close:</strong>
-              ${{ "%.2f"|format(predicted_price) }}
-      </div>
-    {% endif %}
-
       <!-- 4. Recent News -->
       <div class="card">
         <h2>4. Recent News</h2>
