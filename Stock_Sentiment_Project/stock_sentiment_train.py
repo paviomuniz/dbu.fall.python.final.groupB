@@ -15,19 +15,25 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.ensemble import RandomForestClassifier
 
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 ###Load data
 # Load the data from uploaded CSV file into a pandas DataFramw with selected columns
 # Load news data
 
-df_news = pd.read_csv('Google_News_Data_official.csv',usecols=["uuid", "title", "description","keywords","snippet","published_at"])
+df_news = pd.read_csv(
+    os.path.join(BASE_DIR, "Google_News_Data_official.csv"),
+    usecols=["uuid", "title", "description", "keywords", "snippet", "published_at"]
+)
 print("News data loaded successfully.")
 print("First 5 rows of the DataFrame:")
 df_news.head()
 
 # Load stock price data
-df_prices = pd.read_csv('googl_daily_prices.csv')
+df_prices = df_prices = pd.read_csv(
+    os.path.join(BASE_DIR, "googl_daily_prices.csv")
+)
 print("Stock price data loaded successfully.")
 print("First 5 rows of df_prices:")
 print(df_prices.head())
