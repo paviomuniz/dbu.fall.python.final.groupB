@@ -297,7 +297,9 @@ plt.show()
 print("___________________________")
 print("Random Forest Classification Model")
 # Create a new target variable 'price_change_sign'
-daily_sentiment_prices['price_change_sign'] = np.where(daily_sentiment_prices['daily_percent_change'] > 0, 1, 0)
+daily_sentiment_prices['price_change_sign'] = np.where(
+    daily_sentiment_prices['daily_return'] > 0, 1, 0
+)
 # Define the independent variable X
 X = daily_sentiment_prices[['avg_sentiment']]
 # Define the dependent variable y
@@ -376,6 +378,15 @@ plt.ylabel('Actual')
 plt.tight_layout()
 plt.show()
 
+import pickle
+
+MODEL_DIR = os.path.join(BASE_DIR, "models")
+os.makedirs(MODEL_DIR, exist_ok=True)
+
+with open(os.path.join(MODEL_DIR, "rf_sentiment_classifier.pkl"), "wb") as f:
+    pickle.dump(random_forest_classifier, f)
+
+print("Random Forest classifier saved successfully.")
 
 #     from sklearn.model_selection import train_test_split
 #     X_train, X_test, y_train, y_test = train_test_split(

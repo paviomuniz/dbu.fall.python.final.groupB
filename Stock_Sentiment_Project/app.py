@@ -1,5 +1,4 @@
 from flask import Flask, render_template, request
-from stock_sentiment_train import train_bp
 import pandas as pd
 import pickle
 import os
@@ -14,6 +13,13 @@ import nltk
 from nltk.sentiment import SentimentIntensityAnalyzer
 
 ARTIFACT_DIR = os.path.join(os.path.dirname(__file__), "artifacts")
+MODEL_DIR = os.path.join(os.path.dirname(__file__), "models")
+
+try:
+    with open(os.path.join(MODEL_DIR, "rf_sentiment_classifier.pkl"), "rb") as f:
+        rf_model = pickle.load(f)
+except Exception:
+    rf_model = None
 
 # ------------------------------------------------------------
 # Load model, scaler, and data (still used for chart/table)
@@ -503,8 +509,7 @@ TEMPLATE = """
 </html>
 """
 
-app = Flask(__name__, template_folder="tamplate")
-app.register_blueprint(train_bp)
+app = Flask(__name__, template_folder="templates")
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -613,16 +618,18 @@ def index():
         # sentiment >= 0.05   -> UP
         # sentiment <= -0.05  -> DOWN
         # otherwise           -> UNCERTAIN
-        if sentiment_score is not None:
-            if sentiment_score >= 0.05:
-                prediction_text = "UP 📈"
+            if sentiment_score is not None and rf_model is not None:
+              proba = rf_model.predict_proba([[sentiment_score]])[0]
+              pred = int(proba.argmax())
+              confidence = round(proba[pred] * 100, 2)
+
+              if pred == 1:
+                prediction_text = f"UP 📈 ({confidence}%)"
                 css_class = "up"
-            elif sentiment_score <= -0.05:
-                prediction_text = "DOWN 📉"
+              else:
+                prediction_text = f"DOWN 📉 ({confidence}%)"
                 css_class = "down"
-            else:
-                prediction_text = "UNCERTAIN 🤔"
-                css_class = "neutral"
+
 
             # Store in history (max 10 items)
             HEADLINE_HISTORY.append({
