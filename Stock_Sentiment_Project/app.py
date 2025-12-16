@@ -30,13 +30,11 @@ try:
 except Exception:
     scaler = None
 
-data = pd.read_csv(os.path.join(ARTIFACT_DIR, "data_with_sentiment.csv"))
-data.columns = [c.lower() for c in data.columns]
+def load_data():
+    d = pd.read_csv(os.path.join(ARTIFACT_DIR, "data_with_sentiment.csv"))
+    d.columns = [c.lower() for c in d.columns]
+    return d
 
-# detect key columns
-date_col = [c for c in data.columns if "date" in c][0]
-price_col = [c for c in data.columns if "close" in c][0]
-volume_col = [c for c in data.columns if "volume" in c][0]
 
 
 # ------------------------------------------------------------
@@ -509,6 +507,10 @@ app.register_blueprint(train_bp)
 
 @app.route("/", methods=["GET", "POST"])
 def index():
+    data = load_data()
+    date_col = [c for c in data.columns if "date" in c][0]
+    price_col = [c for c in data.columns if "close" in c][0]
+
     prediction_text = None
     sentiment_score = None
     css_class = ""

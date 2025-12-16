@@ -14,7 +14,6 @@ from nltk.sentiment import SentimentIntensityAnalyzer
 
  
 
-
 def run_training(stock_path: str, news_path: str) -> Dict[str, float]:
     """Run end-to-end training using the given local CSV paths.
 
@@ -60,6 +59,8 @@ def run_training(stock_path: str, news_path: str) -> Dict[str, float]:
     title_col = news_title_candidates[0]
 
     stocks[date_col_stock] = pd.to_datetime(stocks[date_col_stock])
+          
+    
     stocks = stocks.sort_values(date_col_stock)
 
     news[date_col_news] = pd.to_datetime(news[date_col_news])
