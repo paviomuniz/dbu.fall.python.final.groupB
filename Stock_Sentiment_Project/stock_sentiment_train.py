@@ -152,6 +152,7 @@ daily_sentiment_prices['moving_sentiment'] = (
 )
 daily_sentiment_prices['daily_return'] = (daily_sentiment_prices['avg_close'] - daily_sentiment_prices['avg_close'].shift(1)) / daily_sentiment_prices['avg_close'].shift(1)
 
+### ------------------------------------------------------------------
 ## Visulize relationship between news sentiment score and stock price
 # Graph 1
 sns.lineplot(x='published_date', y='moving_sentiment', data=daily_sentiment_prices, label='Moving Sentiment', color='blue')
@@ -286,6 +287,40 @@ plt.grid(True)
 plt.tight_layout()
 plt.show()
 
+### Linear Regression for binary classification
+print("__________________________")
+print("Linear Regression model for Binary Classification")
+# Split the data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+print("Data split into training and testing sets.")
+print(f"X_train shape: {X_train.shape}")
+print(f"X_test shape: {X_test.shape}")
+print(f"y_train shape: {y_train.shape}")
+print(f"y_test shape: {y_test.shape}")
+
+# Initialize and train the Linear Regression model
+linear_model = LinearRegression()
+linear_model.fit(X_train, y_train)
+
+# Make predictions on the test set (continuous values)
+y_pred_linear_continuous = linear_model.predict(X_test)
+
+# Convert continuous predictions to binary outcomes using a threshold of 0.5
+y_pred_linear_binary = np.where(y_pred_linear_continuous >= 0.5, 1, 0)
+
+# Evaluate the model using classification metrics
+accuracy_linear = accuracy_score(y_test, y_pred_linear_binary)
+precision_linear = precision_score(y_test, y_pred_linear_binary)
+recall_linear = recall_score(y_test, y_pred_linear_binary)
+f1_linear = f1_score(y_test, y_pred_linear_binary)
+
+print("Linear Regression Model Training and Evaluation for Binary Classification:")
+print(f"Accuracy: {accuracy_linear:.2f}")
+print(f"Precision: {precision_linear:.2f}")
+print(f"Recall: {recall_linear:.2f}")
+print(f"F1-score: {f1_linear:.2f}")
+
 
 ### Random Forest Classifier model
 print("___________________________")
@@ -304,6 +339,7 @@ print(f"X_train shape: {X_train.shape}")
 print(f"X_test shape: {X_test.shape}")
 print(f"y_train shape: {y_train.shape}")
 print(f"y_test shape: {y_test.shape}")
+
 
 # Initialize and train the Random Forest Classifier model
 random_forest_classifier = RandomForestClassifier(random_state=42)
