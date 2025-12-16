@@ -287,23 +287,30 @@
           })();
         </script>
 
-        {% if prediction is not none %}
-          <div class="prediction {{ css_class }}">
-            <span class="label">Prediction:</span> {{ prediction }}
-          </div>
-          <div class="sentiment-score">
-            Headline sentiment (final score): {{ "%.3f"|format(sentiment) }}
-            Sentiment (VADER compound): {{ "%.3f"|format(sentiment) }}
-          </div>
-          {% if analyzed_text %}
-          <div class="sentiment-score">
-            Analyzed source: {{ analyzed_source }}
-          </div>
-          <div class="sentiment-score">
-            Text snippet: {{ analyzed_text|truncate(300) }}
-          </div>
-          {% endif %}
-        {% endif %}
+    {% if prediction %}
+      <div class="prediction {{ css_class }}">
+        <span class="label">Prediction:</span> {{ prediction }}
+      </div>
+
+      <div class="sentiment-score">
+        <strong>Final sentiment score:</strong> {{ "%.3f"|format(sentiment) }}
+      </div>
+
+      <div class="sentiment-score">
+        <strong>ML confidence:</strong> {{ ml_confidence }}% probability of price increase
+      </div>
+
+      {% if analyzed_text %}
+      <div class="sentiment-score">
+        <strong>Analyzed source:</strong> {{ analyzed_source }}
+      </div>
+      <div class="sentiment-score">
+        <strong>Text snippet:</strong> {{ analyzed_text|truncate(300) }}
+      </div>
+      {% endif %}
+    {% endif %}
+
+
       </div>
       <!-- 4. Recent News -->
       <div class="card">

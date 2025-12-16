@@ -514,6 +514,7 @@ app = Flask(__name__, template_folder="templates")
 
 @app.route("/", methods=["GET", "POST"])
 def index():
+    ml_confidence = None
     prediction_text = None
     sentiment_score = None
     css_class = ""
@@ -620,7 +621,10 @@ def index():
         # sentiment <= -0.05  -> DOWN
         # otherwise           -> UNCERTAIN
             if sentiment_score is not None and rf_model is not None:
-              proba = rf_model.predict_proba([[sentiment_score]])[0]
+              proba = rf_model.predict_proba([[sentiment_score]])
+              # ML confidence (probability of UP movement)
+              ml_confidence = round(float(proba[0][1]) * 100, 2)
+
               pred = int(proba.argmax())
               confidence = round(proba[pred] * 100, 2)
 
@@ -665,7 +669,8 @@ def index():
         bulk_results=bulk_results,
         selected_source_type=request.form.get("source_type", "content") if request.method == "POST" else "content",
         price_json=price_json,
-        predicted_price=predicted_price   
+        predicted_price=predicted_price, 
+        ml_confidence=ml_confidence  
     )
 
 
