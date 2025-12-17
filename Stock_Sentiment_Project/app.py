@@ -279,8 +279,10 @@ def index():
               # ML confidence (probability of UP movement)
               ml_confidence = round(float(proba[0][1]) * 100, 2)
 
-              pred = int(proba.argmax())
-              confidence = round(proba[pred] * 100, 2)
+              # Determine predicted class for the first (and only) sample
+              pred = int(proba[0].argmax())
+              # Use the class probability for that prediction (a float)
+              confidence = round(float(proba[0][pred]) * 100, 2)
 
 
 
