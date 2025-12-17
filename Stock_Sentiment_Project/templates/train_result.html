@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Model Training Results</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f3f4f8;
+      color: #111827;
+    }
+    .header {
+      background: linear-gradient(120deg, #2563eb, #10b981);
+      padding: 20px 30px;
+      color: white;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.3);
+    }
+    .header h1 { margin: 0; font-size: 26px; font-weight: 600; }
+    .header p { margin: 6px 0 0; font-size: 14px; opacity: 0.9; }
+
+    .page {
+      max-width: 1100px;
+      margin: 25px auto 40px;
+      padding: 0 16px;
+    }
+    .card {
+      background: white;
+      border-radius: 14px;
+      padding: 18px 20px;
+      box-shadow: 0 1px 6px rgba(15, 23, 42, 0.12);
+      margin-bottom: 18px;
+    }
+    .card h2 {
+      margin: 0 0 10px;
+      font-size: 18px;
+      border-bottom: 1px solid #e5e7eb;
+      padding-bottom: 6px;
+    }
+    img.chart {
+      max-width: 100%;
+      border-radius: 10px;
+      border: 1px solid #e5e7eb;
+    }
+    .btn-back {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 8px 14px;
+      background: #2563eb;
+      color: white;
+      text-decoration: none;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .btn-back:hover { background: #1d4ed8; }
+    pre {
+      background: #f9fafb; 
+      padding: 12px; 
+      border-radius: 8px; 
+      border: 1px solid #e5e7eb;
+      overflow: auto; 
+      max-height: 500px;
+      font-family: Consolas, Monaco, "Andale Mono", monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Model Training Results</h1>
+    <p>Output from the training process.</p>
+    <a href="/" class="btn-back" style="background:rgba(255,255,255,0.2); margin-top:10px;">&larr; Back to Dashboard</a>
+  </div>
+
+  <div class="page">
+    
+    <div class="card">
+        <h2>Training Logs</h2>
+        <pre>{% for line in results.logs %}{{ line }}
+{% endfor %}</pre>
+    </div>
+
+    {% if results.images %}
+    <div class="card">
+        <h2>Generated Visualizations</h2>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            {% for img in results.images %}
+            <div>
+                <img src="{{ url_for('static', filename=img) }}" class="chart" alt="Chart">
+                <p style="text-align:center; font-size:13px; color:#6b7280; margin-top:6px;">{{ img }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div style="text-align:center; margin-top:20px;">
+        <a href="/" class="btn-back">Return to Dashboard</a>
+    </div>
+
+  </div>
+</body>
+</html>

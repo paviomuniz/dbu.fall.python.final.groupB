@@ -12,5 +12,6 @@ dependencies = [
     "pandas>=2.3.3",
     "pip>=25.3",
     "scikit-learn>=1.7.2",
+    "seaborn>=0.13.2",
     "spacy>=3.8.11",
 ]
