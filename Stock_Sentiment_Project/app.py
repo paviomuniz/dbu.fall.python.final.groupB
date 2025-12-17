@@ -512,6 +512,9 @@ app = Flask(__name__, template_folder="templates")
 
 @app.route("/", methods=["GET", "POST"])
 def index():
+    data = load_data()
+    date_col = "date"
+    price_col = "close"
     prediction_text = None
     sentiment_score = None
     css_class = ""
@@ -520,6 +523,7 @@ def index():
     recent_news = []
     bulk_results = []
     predicted_price = None
+    ml_confidence = None
 
     # Fetch recent news for the right column
     for n in duckduckgo_recent_news("google stock", days=3, max_results=30):
@@ -551,7 +555,7 @@ def index():
                 })
         
         action = request.form.get("action", "predict")
-
+        price_json = data[[date_col, price_col, "sentiment_mean"]].to_dict(orient="records")
         if action == "reset_history":
             # Clear the stored headlines
             HEADLINE_HISTORY.clear()
@@ -559,10 +563,10 @@ def index():
         elif action == "predict":
             headline = request.form.get("headline", "")
             base_score = sia.polarity_scores(headline)["compound"]
-        source_type = request.form.get("source_type", "content").strip()
-        content = request.form.get("content", "").strip()
-        url = request.form.get("url", "").strip()
-        text_to_analyze = ""
+            source_type = request.form.get("source_type", "content").strip()
+            content = request.form.get("content", "").strip()
+            url = request.form.get("url", "").strip()
+            text_to_analyze = ""
         if source_type == "content":
             if content:
                 text_to_analyze = content
