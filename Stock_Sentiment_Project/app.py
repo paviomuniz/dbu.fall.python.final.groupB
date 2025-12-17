@@ -1,5 +1,4 @@
 from flask import Flask, render_template, request
-from stock_sentiment_train import train_bp
 import pandas as pd
 import pickle
 import os
@@ -14,6 +13,13 @@ import nltk
 from nltk.sentiment import SentimentIntensityAnalyzer
 
 ARTIFACT_DIR = os.path.join(os.path.dirname(__file__), "artifacts")
+MODEL_DIR = os.path.join(os.path.dirname(__file__), "models")
+
+try:
+    with open(os.path.join(MODEL_DIR, "rf_sentiment_classifier.pkl"), "rb") as f:
+        rf_model = pickle.load(f)
+except Exception:
+    rf_model = None
 
 # ------------------------------------------------------------
 # Load model, scaler, and data (still used for chart/table)
@@ -501,16 +507,11 @@ TEMPLATE = """
 </html>
 """
 
-app = Flask(__name__, template_folder="tamplate")
-app.register_blueprint(train_bp)
+app = Flask(__name__, template_folder="templates")
 
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    data = load_data()
-    date_col = [c for c in data.columns if "date" in c][0]
-    price_col = [c for c in data.columns if "close" in c][0]
-
     prediction_text = None
     sentiment_score = None
     css_class = ""
@@ -518,6 +519,7 @@ def index():
     analyzed_source = ""
     recent_news = []
     bulk_results = []
+    predicted_price = None
 
     # Fetch recent news for the right column
     for n in duckduckgo_recent_news("google stock", days=3, max_results=30):
@@ -615,16 +617,15 @@ def index():
         # sentiment >= 0.05   -> UP
         # sentiment <= -0.05  -> DOWN
         # otherwise           -> UNCERTAIN
-        if sentiment_score is not None:
-            if sentiment_score >= 0.05:
-                prediction_text = "UP 📈"
-                css_class = "up"
-            elif sentiment_score <= -0.05:
-                prediction_text = "DOWN 📉"
-                css_class = "down"
-            else:
-                prediction_text = "UNCERTAIN 🤔"
-                css_class = "neutral"
+            if sentiment_score is not None and rf_model is not None:
+              proba = rf_model.predict_proba([[sentiment_score]])
+              # ML confidence (probability of UP movement)
+              ml_confidence = round(float(proba[0][1]) * 100, 2)
+
+              pred = int(proba.argmax())
+              confidence = round(proba[pred] * 100, 2)
+
+
 
             # Store in history (max 10 items)
             HEADLINE_HISTORY.append({
@@ -664,8 +665,9 @@ def index():
         recent_news=recent_news,
         bulk_results=bulk_results,
         selected_source_type=request.form.get("source_type", "content") if request.method == "POST" else "content",
-        # NEW: send data to the template
         price_json=price_json,
+        predicted_price=predicted_price, 
+        ml_confidence=ml_confidence  
     )
 
 

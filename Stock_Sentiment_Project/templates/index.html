@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Google Stock & News Sentiment Dashboard</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f3f4f8;
+      color: #111827;
+    }
+    .header {
+      background: linear-gradient(120deg, #2563eb, #10b981);
+      padding: 20px 30px;
+      color: white;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.3);
+    }
+    .header h1 { margin: 0; font-size: 26px; font-weight: 600; }
+    .header p { margin: 6px 0 0; font-size: 14px; opacity: 0.9; }
+
+    .page {
+      max-width: 1100px;
+      margin: 25px auto 40px;
+      padding: 0 16px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1.5fr);
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 14px;
+      padding: 18px 20px;
+      box-shadow: 0 1px 6px rgba(15, 23, 42, 0.12);
+      margin-bottom: 18px;
+    }
+    .card h2 {
+      margin: 0 0 10px;
+      font-size: 18px;
+      border-bottom: 1px solid #e5e7eb;
+      padding-bottom: 6px;
+    }
+    .card p.subtitle {
+      margin: 0 0 14px;
+      font-size: 13px;
+      color: #6b7280;
+    }
+    img.chart {
+      max-width: 100%;
+      border-radius: 10px;
+      border: 1px solid #e5e7eb;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th, td {
+      padding: 6px 8px;
+      text-align: left;
+      border-bottom: 1px solid #e5e7eb;
+      vertical-align: top;
+    }
+    th { background: #f9fafb; font-weight: 600; }
+    tr:nth-child(even) td { background: #f9fafb; }
+
+    .form-group { margin-bottom: 10px; }
+    label { display: block; font-size: 14px; margin-bottom: 4px; }
+    input[type="text"] {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      font-size: 14px;
+      outline: none;
+    }
+    input[type="text"]:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+    }
+    textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      font-size: 14px;
+      outline: none;
+      resize: vertical;
+      min-height: 120px;
+    }
+    textarea:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+    }
+    button {
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      background: #2563eb;
+      color: white;
+      font-size: 14px;
+      font-weight: 500;
+      margin-top: 4px;
+    }
+    button:hover { background: #1d4ed8; }
+
+    .btn-reset {
+      background: #6b7280;
+      margin-bottom: 8px;
+    }
+    .btn-reset:hover {
+      background: #4b5563;
+    }
+
+    .prediction {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 14px;
+      display: inline-block;
+    }
+    .prediction.up {
+      background: #ecfdf3;
+      color: #166534;
+      border: 1px solid #bbf7d0;
+    }
+    .prediction.down {
+      background: #fef2f2;
+      color: #b91c1c;
+      border: 1px solid #fecaca;
+    }
+    .prediction.neutral {
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+    }
+    .prediction .label { font-weight: 600; margin-right: 4px; }
+    .sentiment-score {
+      font-size: 13px;
+      color: #4b5563;
+      margin-top: 4px;
+    }
+    .footer {
+      margin-top: 24px;
+      font-size: 12px;
+      color: #9ca3af;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Google Stock & News Sentiment Dashboard</h1>
+    <p>Trained ML model using daily stock prices + news headline sentiment.</p>
+    <p style="margin-top:8px;">
+      <a href="/train" style="color:#fff; text-decoration:underline;">Update model (download & train)</a>
+    </p>
+  </div>
+
+    <div class="page">
+    <div class="grid">
+      <!-- 1. Price vs Sentiment (History) -->
+   <div class="card">
+  <h2>1. Price vs Sentiment (History)</h2>
+  <p class="subtitle">Historical closing price and average daily news sentiment.</p>
+
+  <!-- Container for interactive chart -->
+  <div id="interactiveChart" style="height: 420px;"></div>
+
+  <!-- Load Plotly -->
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script>
+    // Data passed from Flask (Python) as JSON
+    const priceData = {{ price_json | tojson }};
+
+    const dates = priceData.map(row => row.date);
+    const prices = priceData.map(row => row.close);
+    const sentiments = priceData.map(row => row.sentiment_mean);
+
+    const priceTrace = {
+      x: dates,
+      y: prices,
+      name: "Close Price",
+      type: "scatter",
+      mode: "lines",
+      line: { width: 2 }
+    };
+
+    const sentimentTrace = {
+      x: dates,
+      y: sentiments,
+      name: "Average Sentiment",
+      type: "scatter",
+      mode: "lines",
+      yaxis: "y2",
+      line: { width: 2, dash: "dot" }
+    };
+
+    const layout = {
+      title: "Google Stock Price vs News Sentiment (Interactive)",
+      xaxis: { title: "Date" },
+      yaxis: { title: "Price" },
+      yaxis2: {
+        title: "Sentiment",
+        overlaying: "y",
+        side: "right"
+      },
+      hovermode: "x unified",
+      legend: { orientation: "h", y: -0.2 },
+      margin: { l: 50, r: 50, t: 40, b: 40 }
+    };
+
+    Plotly.newPlot("interactiveChart", [priceTrace, sentimentTrace], layout);
+  </script>
+</div>
+
+
+      <!-- 2. Last 10 Trading Days -->
+      <div class="card">
+        <h2>2. Last 10 Trading Days</h2>
+        <p class="subtitle">Recent closing prices and average sentiment (0 means no news that day).</p>
+        <table>
+          <tr>
+            <th>Date</th>
+            <th>Close</th>
+            <th>Average Sentiment</th>
+          </tr>
+          {% for row in last_rows %}
+          <tr>
+            <td>{{ row.date }}</td>
+            <td>{{ "%.2f"|format(row.close) }}</td>
+            <td>{{ "%.3f"|format(row.sentiment_mean) }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+
+      <!-- 3. Paste Content OR Article URL -->
+      <div class="card">
+        <h2>3. Paste Content OR Article URL</h2>
+        <p class="subtitle">
+          Type a news headline about Google. We use VADER + simple keyword rules to classify it
+          as positive, negative, or neutral and then map that to UP / DOWN / UNCERTAIN.
+          Choose one source below. If you enter only a URL, the app will fetch the article and analyze its content. We use VADER to classify it and map to UP / DOWN / UNCERTAIN.
+        </p>
+
+        <form method="post">
+          <input type="hidden" name="action" value="predict">
+          <div class="form-group">
+            <label>Choose source:</label>
+            <label><input type="radio" name="source_type" value="content" {% if selected_source_type == 'content' %}checked{% endif %}> Paste content</label>
+            <label style="margin-left:12px;"><input type="radio" name="source_type" value="url" {% if selected_source_type == 'url' %}checked{% endif %}> Article URL</label>
+          </div>
+          <div class="form-group">
+            <label for="content">Paste news content:</label>
+            <textarea id="content" name="content" placeholder="Paste the article text here..."></textarea>
+          </div>
+          <div class="form-group">
+            <label for="url">News article URL (optional):</label>
+            <input type="text" id="url" name="url" placeholder="https://example.com/news/google-article">
+          </div>
+          <button type="submit">Predict Price Direction</button>
+        </form>
+
+        <script>
+          (function(){
+            function toggle(){
+              var source = document.querySelector('input[name="source_type"]:checked');
+              var isContent = !source || source.value === 'content';
+              var contentEl = document.getElementById('content');
+              var urlEl = document.getElementById('url');
+              var contentGroup = contentEl.parentElement;
+              var urlGroup = urlEl.parentElement;
+              contentGroup.style.display = isContent ? 'block' : 'none';
+              urlGroup.style.display = isContent ? 'none' : 'block';
+              contentEl.required = isContent;
+              urlEl.required = !isContent;
+            }
+            var radios = document.querySelectorAll('input[name="source_type"]');
+            radios.forEach(function(r){ r.addEventListener('change', toggle); });
+            toggle();
+          })();
+        </script>
+
+    {% if prediction %}
+      <div class="prediction {{ css_class }}">
+        <span class="label">Prediction:</span> {{ prediction }}
+      </div>
+
+      <div class="sentiment-score">
+        <strong>Final sentiment score:</strong> {{ "%.3f"|format(sentiment) }}
+      </div>
+
+      <div class="sentiment-score">
+        <strong>ML confidence:</strong> {{ ml_confidence }}% probability of price increase
+      </div>
+
+      {% if analyzed_text %}
+      <div class="sentiment-score">
+        <strong>Analyzed source:</strong> {{ analyzed_source }}
+      </div>
+      <div class="sentiment-score">
+        <strong>Text snippet:</strong> {{ analyzed_text|truncate(300) }}
+      </div>
+      {% endif %}
+    {% endif %}
+
+
+      </div>
+      <!-- 4. Recent News -->
+      <div class="card">
+        <h2>4. Recent News</h2>
+        <p class="subtitle">News from the last 3 days (DuckDuckGo). Select to analyze sentiment.</p>
+        <form method="post">
+          <input type="hidden" name="form_name" value="bulk_news">
+          <table>
+            <tr>
+              <th>Select</th>
+              <th>Title</th>
+              <th>Source</th>
+              <th>Date</th>
+            </tr>
+            {% for n in recent_news %}
+            <tr>
+              <td><input type="checkbox" name="selected_urls" value="{{ n.url }}"></td>
+              <td><a href="{{ n.url }}" target="_blank" rel="noopener">{{ n.title }}</a></td>
+              <td>{{ n.source }}</td>
+              <td>{{ n.date_str }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+          <button type="submit">Analyze Selected</button>
+        </form>
+
+        {% if bulk_results %}
+          <h3 style="margin-top:12px; font-size:16px;">Selected Sentiment</h3>
+          <table>
+            <tr>
+              <th>Title</th>
+              <th>Compound</th>
+              <th>Direction</th>
+            </tr>
+            {% for r in bulk_results %}
+            <tr>
+              <td><a href="{{ r.url }}" target="_blank" rel="noopener">{{ r.title }}</a></td>
+              <td>{{ "%.3f"|format(r.compound) }}</td>
+              <td>{{ r.direction }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- 5. Recent Headline Predictions (history card) -->
+    <div class="card">
+      <h2>5. Recent Headline Predictions</h2>
+      <p class="subtitle">Last 10 headlines you tested, with their sentiment score and predicted direction.</p>
+
+      <form method="post">
+        <input type="hidden" name="action" value="reset_history">
+        <button type="submit" class="btn-reset">Reset history</button>
+      </form>
+
+      {% if history %}
+      <table>
+        <tr>
+          <th>Time</th>
+          <th>Headline</th>
+          <th>Sentiment</th>
+          <th>Prediction</th>
+        </tr>
+        {% for item in history %}
+        <tr>
+          <td style="white-space: nowrap;">{{ item.timestamp }}</td>
+          <td>{{ item.headline }}</td>
+          <td>{{ "%.3f"|format(item.sentiment) }}</td>
+          <td>{{ item.prediction }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% else %}
+      <p class="subtitle">No headlines tested yet. Try entering one above.</p>
+      {% endif %}
+    </div>
+
+    <div class="footer">
+      Academic project • This interactive demo uses a simple sentiment-based rule
+      (not a real trading system).
+    </div>
+  </div>
