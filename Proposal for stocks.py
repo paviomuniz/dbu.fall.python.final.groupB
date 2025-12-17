@@ -72,7 +72,7 @@ This adds an interactive component and allows users to explore insights through 
 We expect to determine:
 •	Whether strong positive sentiment leads to upward price movement.
 •	Whether negative sentiment predicts a drop.
-•	How accurately a simple model can predict price direction based on sentiment.
+•	How accurately a simple model can sentiment score based on sentiment.
 The project does not aim to build a real trading system—just to explore the relationship between news sentiment and stock performance using Python.
 
 6. Tools & Technologies
